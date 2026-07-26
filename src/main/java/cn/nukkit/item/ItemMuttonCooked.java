@@ -1,0 +1,20 @@
+package cn.nukkit.item;
+
+/**
+ * Added for MCPE 0.15.10 creative inventory completeness
+ * Reference: srcOfInfinity creative items
+ */
+public class ItemMuttonCooked extends ItemEdible {
+
+    public ItemMuttonCooked() {
+        this(0, 1);
+    }
+
+    public ItemMuttonCooked(Integer meta) {
+        this(meta, 1);
+    }
+
+    public ItemMuttonCooked(Integer meta, int count) {
+        super(COOKED_MUTTON, meta, count, "Cooked Mutton");
+    }
+}
