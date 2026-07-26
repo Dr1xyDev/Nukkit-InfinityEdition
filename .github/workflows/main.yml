@@ -1,14 +1,13 @@
 # Unpack Nukkit-InfinityEdition.zip into the repository and push the files
 name: Unzip Nukkit-InfinityEdition.zip and commit contents
 
-# Run manually from the Actions tab
 on:
   workflow_dispatch:
     inputs:
       zip_path:
-        description: 'Path to the zip file inside the repo (relative to repo root)'
+        description: "Path to the zip file inside the repo (relative to repo root)"
         required: true
-        default: 'Nukkit-InfinityEdition.zip'
+        default: "Nukkit-InfinityEdition.zip"
 
 permissions:
   contents: write
@@ -16,6 +15,7 @@ permissions:
 jobs:
   unzip-and-commit:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,13 +23,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
-      - name: Install unzip
+      - name: Install unzip and rsync
         run: |
           sudo apt-get update
-          sudo apt-get install -y unzip
+          sudo apt-get install -y unzip rsync
 
       - name: Verify zip exists
         run: |
+          set -euo pipefail
           ZIP_PATH="${{ github.workspace }}/${{ github.event.inputs.zip_path }}"
           if [ ! -f "$ZIP_PATH" ]; then
             echo "Zip file not found: $ZIP_PATH"
@@ -37,32 +38,64 @@ jobs:
           fi
           echo "Found zip: $ZIP_PATH"
 
+      - name: Inspect zip contents
+        run: |
+          set -euo pipefail
+          unzip -l "${{ github.event.inputs.zip_path }}"
+
       - name: Extract zip to repository root
         run: |
           set -euo pipefail
+
           ZIP_PATH="${{ github.workspace }}/${{ github.event.inputs.zip_path }}"
           TMPDIR=$(mktemp -d)
+
           echo "Extracting $ZIP_PATH -> $TMPDIR"
           unzip -o "$ZIP_PATH" -d "$TMPDIR"
-          # Move extracted contents into the workspace root, including dotfiles
-          bash -lc 'shopt -s dotglob; mv "$TMPDIR"/* "${GITHUB_WORKSPACE}/" || true'
+
+          echo "Detecting extracted root..."
+          ROOT="$TMPDIR"
+
+          TOP_DIRS=$(find "$TMPDIR" -mindepth 1 -maxdepth 1 -type d | wc -l)
+          TOP_FILES=$(find "$TMPDIR" -mindepth 1 -maxdepth 1 -type f | wc -l)
+
+          if [ "$TOP_DIRS" -eq 1 ] && [ "$TOP_FILES" -eq 0 ]; then
+            ROOT=$(find "$TMPDIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
+            echo "Single top-level folder detected: $ROOT"
+          else
+            echo "Using extracted root directly: $ROOT"
+          fi
+
+          echo "Syncing extracted files into repository..."
+          rsync -a "$ROOT"/ "$GITHUB_WORKSPACE"/
+
           rm -rf "$TMPDIR"
 
       - name: Show git changes
         run: |
+          set -euo pipefail
+          echo "===== Git status ====="
           git status --porcelain
-          ls -la
+          echo
+          echo "===== Repository tree (top level) ====="
+          find . -maxdepth 2 -type f | sort | sed 's#^\./##' | head -n 300
+          echo
+          echo "===== Git diff stat ====="
+          git diff --stat || true
 
       - name: Commit and push changes
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add -A
-          if git diff --staged --quiet; then
+
+          if git diff --cached --quiet; then
             echo "No changes to commit"
             exit 0
           fi
+
           git commit -m "Unpack ${{ github.event.inputs.zip_path }} into repository"
-          git push
+          git push origin HEAD
