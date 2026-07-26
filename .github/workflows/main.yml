@@ -1,101 +1,74 @@
-# Unpack Nukkit-InfinityEdition.zip into the repository and push the files
-name: Unzip Nukkit-InfinityEdition.zip and commit contents
+name: Compile Nukkit-InfinityEdition
 
 on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
   workflow_dispatch:
-    inputs:
-      zip_path:
-        description: "Path to the zip file inside the repo (relative to repo root)"
-        required: true
-        default: "Nukkit-InfinityEdition.zip"
-
-permissions:
-  contents: write
 
 jobs:
-  unzip-and-commit:
+  compile:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up JDK 8
+        uses: actions/setup-java@v4
         with:
-          fetch-depth: 0
-          persist-credentials: true
+          java-version: '8'
+          distribution: 'temurin'
 
-      - name: Install unzip and rsync
+      - name:  Install leveldb.jar to local Maven repo
         run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip rsync
+          mvn install:install-file \
+            -Dfile=lib/leveldb.jar \
+            -DgroupId=com.tinfoiled.mcpe.leveldb \
+            -DartifactId=leveldb \
+            -Dversion=0.8 \
+            -Dpackaging=jar
 
-      - name: Verify zip exists
+      - name:  Compile with Maven
+        run: mvn clean package --batch-mode -DskipTests
+
+      - name:  Rename shaded JAR to server.jar
         run: |
-          set -euo pipefail
-          ZIP_PATH="${{ github.workspace }}/${{ github.event.inputs.zip_path }}"
-          if [ ! -f "$ZIP_PATH" ]; then
-            echo "Zip file not found: $ZIP_PATH"
+          JAR_FILE=$(find target -maxdepth 1 -type f -name "*.jar" \
+            ! -name "original-*.jar" \
+            ! -name "*-sources.jar" \
+            ! -name "*-javadoc.jar" \
+            -print | head -n 1)
+
+          if [ -z "$JAR_FILE" ]; then
+            echo " No se encontró el JAR shaded en target/"
+            ls -la target/
             exit 1
           fi
-          echo "Found zip: $ZIP_PATH"
 
-      - name: Inspect zip contents
+          echo "JAR encontrado: $JAR_FILE"
+          cp "$JAR_FILE" target/server.jar
+          echo "Copiado como target/server.jar"
+
+      - name: Upload server.jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-jar
+          path: target/server.jar
+          if-no-files-found: error
+          retention-days: 14
+
+      - name:  Build summary
+        if: always()
         run: |
-          set -euo pipefail
-          unzip -l "${{ github.event.inputs.zip_path }}"
-
-      - name: Extract zip to repository root
-        run: |
-          set -euo pipefail
-
-          ZIP_PATH="${{ github.workspace }}/${{ github.event.inputs.zip_path }}"
-          TMPDIR=$(mktemp -d)
-
-          echo "Extracting $ZIP_PATH -> $TMPDIR"
-          unzip -o "$ZIP_PATH" -d "$TMPDIR"
-
-          echo "Detecting extracted root..."
-          ROOT="$TMPDIR"
-
-          TOP_DIRS=$(find "$TMPDIR" -mindepth 1 -maxdepth 1 -type d | wc -l)
-          TOP_FILES=$(find "$TMPDIR" -mindepth 1 -maxdepth 1 -type f | wc -l)
-
-          if [ "$TOP_DIRS" -eq 1 ] && [ "$TOP_FILES" -eq 0 ]; then
-            ROOT=$(find "$TMPDIR" -mindepth 1 -maxdepth 1 -type d | head -n 1)
-            echo "Single top-level folder detected: $ROOT"
-          else
-            echo "Using extracted root directly: $ROOT"
-          fi
-
-          echo "Syncing extracted files into repository..."
-          rsync -a "$ROOT"/ "$GITHUB_WORKSPACE"/
-
-          rm -rf "$TMPDIR"
-
-      - name: Show git changes
-        run: |
-          set -euo pipefail
-          echo "===== Git status ====="
-          git status --porcelain
-          echo
-          echo "===== Repository tree (top level) ====="
-          find . -maxdepth 2 -type f | sort | sed 's#^\./##' | head -n 300
-          echo
-          echo "===== Git diff stat ====="
-          git diff --stat || true
-
-      - name: Commit and push changes
-        run: |
-          set -euo pipefail
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          git add -A
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-            exit 0
-          fi
-
-          git commit -m "Unpack ${{ github.event.inputs.zip_path }} into repository"
-          git push origin HEAD
+          echo "========================================="
+          echo "  Nukkit-InfinityEdition Build Summary"
+          echo "========================================="
+          echo "Commit: ${{ github.sha }}"
+          echo "Branch: ${{ github.ref_name }}"
+          echo "Java:   $(java -version 2>&1 | head -1)"
+          echo ""
+          echo "Archivos generados en target/:"
+          ls -lh target/*.jar 2>/dev/null || echo "  (no JARs found)"
+          echo "========================================="

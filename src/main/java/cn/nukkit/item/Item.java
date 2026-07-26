@@ -527,6 +527,25 @@ public class Item implements Cloneable {
 
     public static final int GOLDEN_APPLE_ENCHANTED = 466;
 
+    // === Added for MCPE 0.15.10 creative inventory completeness (reference: srcOfInfinity) ===
+    public static final int STICKY_PISTON = 29;
+    public static final int PISTON = 33;
+    public static final int RED_SANDSTONE = 179;
+    public static final int SADDLE = 329;
+    public static final int FIRE_CHARGE = 385;
+    public static final int FIREBALL = 385;
+    public static final int CARROT_ON_A_STICK = 398;
+    public static final int CARROT_STICK = 398;
+    public static final int HORSE_ARMOR_IRON = 417;
+    public static final int HORSE_ARMOR_GOLD = 418;
+    public static final int HORSE_ARMOR_DIAMOND = 419;
+    public static final int LEAD = 420;
+    public static final int NAME_TAG = 421;
+    public static final int NAMETAG = 421;
+    public static final int RAW_MUTTON = 423;
+    public static final int COOKED_MUTTON = 424;
+
+
     public static Class[] list = null;
 
     protected Block block = null;
@@ -720,6 +739,20 @@ public class Item implements Cloneable {
             list[ROTTEN_FLESH] = ItemRottenFlesh.class;
             list[ITEM_FRAME] = ItemItemFrame.class;
             list[FLOWER_POT] = ItemFlowerPot.class;
+
+
+            // === Added for MCPE 0.15.10 creative inventory completeness ===
+            list[ENCHANTED_BOOK] = ItemBookEnchanted.class;
+            list[FIRE_CHARGE] = ItemFireCharge.class;
+            list[CARROT_ON_A_STICK] = ItemCarrotOnAStick.class;
+            list[HORSE_ARMOR_IRON] = ItemHorseArmorIron.class;
+            list[HORSE_ARMOR_GOLD] = ItemHorseArmorGold.class;
+            list[HORSE_ARMOR_DIAMOND] = ItemHorseArmorDiamond.class;
+            list[LEAD] = ItemLead.class;
+            list[NAME_TAG] = ItemNameTag.class;
+            list[SADDLE] = ItemSaddle.class;
+            list[RAW_MUTTON] = ItemMuttonRaw.class;
+            list[COOKED_MUTTON] = ItemMuttonCooked.class;
 
             for (int i = 0; i < 256; ++i) {
                 if (Block.list[i] != null) {
@@ -1272,6 +1305,43 @@ public class Item implements Cloneable {
         addCreativeItem(Item.get(Item.SPLASH_POTION, ItemPotion.STRENGTH_II));
         addCreativeItem(Item.get(Item.SPLASH_POTION, ItemPotion.WEAKNESS));
         addCreativeItem(Item.get(Item.SPLASH_POTION, ItemPotion.WEAKNESS_LONG));
+
+        // === Added missing items for MCPE 0.15.10 creative inventory completeness ===
+        // Reference: srcOfInfinity creative items
+
+        // Blocks (pistons + red sandstone) added in 0.14/0.15
+        addCreativeItem(Item.get(Item.PISTON, 0));
+        addCreativeItem(Item.get(Item.STICKY_PISTON, 0));
+        addCreativeItem(Item.get(Item.RED_SANDSTONE, 0));
+        addCreativeItem(Item.get(Item.RED_SANDSTONE, 1)); // Chiseled
+        addCreativeItem(Item.get(Item.RED_SANDSTONE, 2)); // Smooth
+
+        // Horse update items
+        addCreativeItem(Item.get(Item.SADDLE, 0));
+        addCreativeItem(Item.get(Item.HORSE_ARMOR_IRON, 0));
+        addCreativeItem(Item.get(Item.HORSE_ARMOR_GOLD, 0));
+        addCreativeItem(Item.get(Item.HORSE_ARMOR_DIAMOND, 0));
+        addCreativeItem(Item.get(Item.LEAD, 0));
+        addCreativeItem(Item.get(Item.NAME_TAG, 0));
+        addCreativeItem(Item.get(Item.CARROT_ON_A_STICK, 0));
+        addCreativeItem(Item.get(Item.FIRE_CHARGE, 0));
+        addCreativeItem(Item.get(Item.ENCHANTED_BOOK, 0));
+
+        // Food
+        addCreativeItem(Item.get(Item.RAW_MUTTON, 0));
+        addCreativeItem(Item.get(Item.COOKED_MUTTON, 0));
+
+        // Missing spawn eggs (gap 10-48)
+        addCreativeItem(Item.get(Item.SPAWN_EGG, 23)); // Horse
+        addCreativeItem(Item.get(Item.SPAWN_EGG, 24)); // Donkey
+        addCreativeItem(Item.get(Item.SPAWN_EGG, 25)); // Mule
+        addCreativeItem(Item.get(Item.SPAWN_EGG, 26)); // Skeleton Horse
+        addCreativeItem(Item.get(Item.SPAWN_EGG, 27)); // Zombie Horse
+        addCreativeItem(Item.get(Item.SPAWN_EGG, 45)); // Witch
+        addCreativeItem(Item.get(Item.SPAWN_EGG, 46)); // Stray
+        addCreativeItem(Item.get(Item.SPAWN_EGG, 47)); // Husk
+        addCreativeItem(Item.get(Item.SPAWN_EGG, 48)); // Wither Skeleton
+
     }
 
     public static void clearCreativeItems() {

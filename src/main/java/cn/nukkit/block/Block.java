@@ -267,6 +267,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable {
     public static final int DARK_OAK_DOOR_BLOCK = 197;
 
     public static final int GRASS_PATH = 198;
+
+    // === Added for MCPE 0.15.10 creative inventory completeness ===
+    public static final int STICKY_PISTON = 29;
+    public static final int PISTON = 33;
+    public static final int RED_SANDSTONE = 179;
+
     public static final int ITEM_FRAME_BLOCK = 199;
 
     public static final int PODZOL = 243;
@@ -489,6 +495,12 @@ public abstract class Block extends Position implements Metadatable, Cloneable {
             list[WOODEN_PRESSURE_PLATE] = BlockPressurePlateWood.class;
 
             list[SKULL_BLOCK] = BlockSkull.class;
+
+
+            // === Added for MCPE 0.15.10 creative inventory completeness ===
+            list[PISTON] = BlockPiston.class;
+            list[STICKY_PISTON] = BlockPistonSticky.class;
+            list[RED_SANDSTONE] = BlockRedSandstone.class;
 
             for (int id = 0; id < 256; id++) {
                 Class c = list[id];
