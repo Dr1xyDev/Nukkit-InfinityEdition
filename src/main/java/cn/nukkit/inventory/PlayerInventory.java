@@ -1,3 +1,13 @@
+/*
+ *
+ *
+ * NUKKIT INFINITY
+ *
+ *
+ * Mantenido por @Dr1xyDev 
+ * GH: https://www.github.com/Dr1xyDev/Nukkit-InfinityEdition
+ *
+ */
 package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
@@ -333,7 +343,8 @@ public class PlayerInventory extends BaseInventory {
             if (items[i].getId() == Item.AIR) {
                 this.clear(this.getSize() + i);
             } else {
-                this.setItem(this.getSize() + 1, items[i]);
+                // NUKKIT INFINITY: fixed index — was "+ 1" which only overwrote chestplate.
+                this.setItem(this.getSize() + i, items[i]);
             }
         }
     }
