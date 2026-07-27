@@ -1,3 +1,13 @@
+/*
+ *
+ *
+ * NUKKIT INFINITY
+ *
+ *
+ * Mantenido por @Dr1xyDev 
+ * GH: https://www.github.com/Dr1xyDev/Nukkit-InfinityEdition
+ *
+ */
 package cn.nukkit.inventory;
 
 import cn.nukkit.Player;
@@ -60,13 +70,13 @@ public class SimpleTransactionGroup implements TransactionGroup {
             return;
         }
 
+        // NUKKIT INFINITY: arrival-order replacement.
+        // Old code compared timestamps, which could leave a stale transaction in the set
+        // when two packets arrived in the same millisecond. Always replace older same-slot
+        // transactions with the newest one — last write wins, matching client intent.
         for (Transaction tx : new HashSet<>(this.transactions)) {
             if (tx.getInventory().equals(transaction.getInventory()) && tx.getSlot() == transaction.getSlot()) {
-                if (transaction.getCreationTime() >= tx.getCreationTime()) {
-                    this.transactions.remove(tx);
-                } else {
-                    return;
-                }
+                this.transactions.remove(tx);
             }
         }
 

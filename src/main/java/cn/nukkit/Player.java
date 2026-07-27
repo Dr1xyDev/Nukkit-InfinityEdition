@@ -1,3 +1,13 @@
+/*
+ *
+ *
+ * NUKKIT INFINITY
+ *
+ *
+ * Mantenido por @Dr1xyDev 
+ * GH: https://www.github.com/Dr1xyDev/Nukkit-InfinityEdition
+ *
+ */
 package cn.nukkit;
 
 import cn.nukkit.block.Block;
@@ -1483,14 +1493,19 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                     this.inAirTicks = 0;
                     this.highestPosition = this.y;
                 } else {
+                    // NUKKIT INFINITY: Anti-fly only — preserve vanilla fall.
+                    // Old code zeroed motionX/Z and yanked the player down (setMotion(0, v, 0)),
+                    // which felt like being pulled hard. Vanilla falls use real gravity on motionY,
+                    // so we only clamp Y and never touch horizontal motion.
                     if (!this.getAdventureSettings().canFly() && this.inAirTicks > 10 && !this.isSleeping() && !this.getDataPropertyBoolean(DATA_NO_AI)) {
                         double expectedVelocity = (-this.getGravity()) / ((double) this.getDrag()) - ((-this.getGravity()) / ((double) this.getDrag())) * Math.exp(-((double) this.getDrag()) * ((double) (this.inAirTicks - this.startAirTicks)));
                         double diff = (this.speed.y - expectedVelocity) * (this.speed.y - expectedVelocity);
 
-                        if (!this.hasEffect(Effect.JUMP) && diff > 0.6 && expectedVelocity < this.speed.y && !this.server.getAllowFlight()) {
+                        if (!this.hasEffect(Effect.JUMP) && diff > 1.5 && expectedVelocity < this.speed.y && !this.server.getAllowFlight()) {
                             if (this.inAirTicks < 100) {
-                                //this.sendSettings();
-                                this.setMotion(new Vector3(0, expectedVelocity, 0));
+                                // Only clamp server-side motionY; let the client keep its own
+                                // horizontal prediction. No packet is sent — avoids yank.
+                                this.motionY = expectedVelocity;
                             } else if (this.kick("Flying is not enabled on this server")) {
                                 return false;
                             }
@@ -3008,7 +3023,63 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             break;
                         }
 
-                        transaction = new BaseTransaction(this.inventory, containerSetSlotPacket.slot + this.inventory.getSize(), this.inventory.getArmorItem(containerSetSlotPacket.slot), containerSetSlotPacket.item);
+                        // NUKKIT INFINITY: Armor-equip anti-duplication.
+                        // The transaction queue can desync when the player swaps armor fast, because
+                        // canExecute() requires matching haveItems/needItems but the client may
+                        // batch packets out of order. Handle armor slot changes synchronously:
+                        // - swap target item out of armor slot (return it to main inv or drop)
+                        // - if target item is not AIR, consume exactly one matching item from main inv
+                        // - apply armor slot change immediately
+                        // - resync the client to the real server state
+                        Item newArmor = containerSetSlotPacket.item;
+                        int armorSlot = containerSetSlotPacket.slot + this.inventory.getSize();
+                        Item oldArmor = this.inventory.getItem(armorSlot);
+
+                        // Put the previously equipped armor back into main inventory (or drop if full)
+                        if (oldArmor.getId() != Item.AIR && oldArmor.getCount() > 0) {
+                            Item[] leftover = this.inventory.addItem(oldArmor);
+                            for (Item drop : leftover) {
+                                this.level.dropItem(this, drop);
+                            }
+                        }
+
+                        // Take one matching item from main inventory for the new armor piece
+                        // (skip for creative — they can pull items from the creative catalog)
+                        if (newArmor.getId() != Item.AIR && newArmor.getCount() > 0 && !this.isCreative()) {
+                            boolean found = false;
+                            for (int i = 0; i < this.inventory.getSize(); i++) {
+                                Item it = this.inventory.getItem(i);
+                                if (it.equals(newArmor, true, true) && it.getCount() >= newArmor.getCount()) {
+                                    Item shrink = it.clone();
+                                    shrink.setCount(it.getCount() - newArmor.getCount());
+                                    if (shrink.getCount() <= 0) {
+                                        this.inventory.clear(i);
+                                    } else {
+                                        this.inventory.setItem(i, shrink);
+                                    }
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            if (!found) {
+                                // Couldn't find the item — abort and resync to prevent dup
+                                this.inventory.sendArmorSlot(armorSlot, this);
+                                this.inventory.sendContents(this);
+                                break;
+                            }
+                        }
+
+                        // Apply the new armor slot
+                        if (newArmor.getId() == Item.AIR || newArmor.getCount() <= 0) {
+                            this.inventory.clear(armorSlot);
+                        } else {
+                            this.inventory.setArmorItem(containerSetSlotPacket.slot, newArmor);
+                        }
+
+                        // Resync client to actual server state — kills any client-side ghost items
+                        this.inventory.sendArmorContents(this);
+                        this.inventory.sendContents(this);
+                        break;
                     } else if (this.windowIndex.containsKey(containerSetSlotPacket.windowid)) {
                         this.craftingType = 0;
                         Inventory inv = this.windowIndex.get(containerSetSlotPacket.windowid);
