@@ -1,3 +1,13 @@
+/*
+ *
+ *
+ * NUKKIT INFINITY
+ *
+ *
+ * Mantenido por @Dr1xyDev 
+ * GH: https://www.github.com/Dr1xyDev/Nukkit-InfinityEdition
+ *
+ */
 package cn.nukkit.entity;
 
 import cn.nukkit.Player;
@@ -86,6 +96,13 @@ public class EntityHuman extends EntityCreature implements InventoryHolder {
         return inventory;
     }
 
+    // NUKKIT INFINITY: FloatingInventory — buffer for items in transit during transactions.
+    protected cn.nukkit.inventory.FloatingInventory floatingInventory;
+
+    public cn.nukkit.inventory.FloatingInventory getFloatingInventory() {
+        return floatingInventory;
+    }
+
     @Override
     protected void initEntity() {
         this.setDataFlag(DATA_PLAYER_FLAGS, DATA_PLAYER_FLAG_SLEEP, false);
@@ -93,6 +110,7 @@ public class EntityHuman extends EntityCreature implements InventoryHolder {
         this.setDataProperty(new PositionEntityData(DATA_PLAYER_BED_POSITION, 0, 0, 0), false);
 
         this.inventory = new PlayerInventory(this);
+        this.floatingInventory = new cn.nukkit.inventory.FloatingInventory(this);
         if (this instanceof Player) {
             ((Player) this).addWindow(this.inventory, 0);
         }
