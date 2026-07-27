@@ -4,7 +4,7 @@
  * NUKKIT INFINITY
  *
  *
- * Mantenido por @Dr1xyDev 
+ * Mantenido por @Dr1xyDev
  * GH: https://www.github.com/Dr1xyDev/Nukkit-InfinityEdition
  *
  */
@@ -17,13 +17,12 @@ import cn.nukkit.event.inventory.InventoryTransactionEvent;
 import cn.nukkit.item.Item;
 
 import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 /**
- * author: MagicDroidX
- * Nukkit Project
+ * NUKKIT INFINITY: Simplified transaction group.
+ *
  */
 public class SimpleTransactionGroup implements TransactionGroup {
 
@@ -32,9 +31,10 @@ public class SimpleTransactionGroup implements TransactionGroup {
 
     protected Player source = null;
 
-    protected final Set<Inventory> inventories = new HashSet<>();
+    protected final Set<Inventory> inventories = new LinkedHashSet<>();
 
-    protected final Set<Transaction> transactions = new HashSet<>();
+    // LinkedHashSet preserves arrival order — critical for correctness.
+    protected final Set<Transaction> transactions = new LinkedHashSet<>();
 
     public SimpleTransactionGroup() {
         this(null);
@@ -70,11 +70,9 @@ public class SimpleTransactionGroup implements TransactionGroup {
             return;
         }
 
-        // NUKKIT INFINITY: arrival-order replacement.
-        // Old code compared timestamps, which could leave a stale transaction in the set
-        // when two packets arrived in the same millisecond. Always replace older same-slot
-        // transactions with the newest one — last write wins, matching client intent.
-        for (Transaction tx : new HashSet<>(this.transactions)) {
+        // Arrival-order replacement: last write to a slot wins.
+        // Old Nukkit compared timestamps which could leave stale txns in the set.
+        for (Transaction tx : new ArrayList<>(this.transactions)) {
             if (tx.getInventory().equals(transaction.getInventory()) && tx.getSlot() == transaction.getSlot()) {
                 this.transactions.remove(tx);
             }
@@ -84,47 +82,10 @@ public class SimpleTransactionGroup implements TransactionGroup {
         this.inventories.add(transaction.getInventory());
     }
 
-    protected boolean matchItems(List<Item> needItems, List<Item> haveItems) {
-        for (Transaction ts : this.transactions) {
-            if (ts.getTargetItem().getId() != Item.AIR) {
-                needItems.add(ts.getTargetItem());
-            }
-            Item checkSourceItem = ts.getInventory().getItem(ts.getSlot());
-            Item sourceItem = ts.getSourceItem();
-            if (!checkSourceItem.deepEquals(sourceItem) || sourceItem.getCount() != checkSourceItem.getCount()) {
-                return false;
-            }
-            if (sourceItem.getId() != Item.AIR) {
-                haveItems.add(sourceItem);
-            }
-        }
-
-        for (Item needItem : new ArrayList<>(needItems)) {
-            for (Item haveItem : new ArrayList<>(haveItems)) {
-                if (needItem.deepEquals(haveItem)) {
-                    int amount = Math.min(haveItem.getCount(), needItem.getCount());
-                    needItem.setCount(needItem.getCount() - amount);
-                    haveItem.setCount(haveItem.getCount() - amount);
-                    if (haveItem.getCount() == 0) {
-                        haveItems.remove(haveItem);
-                    }
-                    if (needItem.getCount() == 0) {
-                        needItems.remove(needItem);
-                        break;
-                    }
-                }
-            }
-        }
-
-        return true;
-    }
-
     @Override
     public boolean canExecute() {
-        List<Item> haveItems = new ArrayList<>();
-        List<Item> needItems = new ArrayList<>();
-
-        return this.matchItems(needItems, haveItems) && haveItems.isEmpty() && needItems.isEmpty() && !this.transactions.isEmpty();
+        // We can always execute — each transaction is independent.
+        return !this.transactions.isEmpty();
     }
 
     @Override
@@ -134,29 +95,53 @@ public class SimpleTransactionGroup implements TransactionGroup {
         }
 
         InventoryTransactionEvent ev = new InventoryTransactionEvent(this);
-
-        for (Transaction transaction : this.transactions) {
-            InventoryClickEvent event = new InventoryClickEvent(transaction.getInventory(), this.getSource(), transaction.getSlot(), transaction.getSourceItem());
-            ev.setCancelled(event.isCancelled());
-        }
-
         Server.getInstance().getPluginManager().callEvent(ev);
+
         if (ev.isCancelled()) {
+            // Resync everything to the player.
             for (Inventory inventory : this.inventories) {
                 if (inventory instanceof PlayerInventory) {
                     ((PlayerInventory) inventory).sendArmorContents(this.getSource());
                 }
                 inventory.sendContents(this.getSource());
             }
-
             return false;
         }
 
-        for (Transaction transaction : this.transactions) {
-            transaction.getInventory().setItem(transaction.getSlot(), transaction.getTargetItem());
+        // Apply each transaction independently in arrival order.
+        for (Transaction transaction : new ArrayList<>(this.transactions)) {
+            Item sourceItem = transaction.getSourceItem();
+            Item targetItem = transaction.getTargetItem();
+
+            // No-op: source and target are the same item with the same count.
+            if (sourceItem.equals(targetItem, true, true)
+                    && sourceItem.getCount() == targetItem.getCount()) {
+                continue;
+            }
+
+            InventoryClickEvent event = new InventoryClickEvent(
+                    transaction.getInventory(), this.getSource(),
+                    transaction.getSlot(), sourceItem);
+            Server.getInstance().getPluginManager().callEvent(event);
+            if (event.isCancelled()) {
+                transaction.getInventory().sendSlot(transaction.getSlot(), this.getSource());
+                continue;
+            }
+
+            // Apply the slot change. setItem handles armor vs. main inv internally
+            // (PlayerInventory.setItem fires EntityArmorChangeEvent for armor slots).
+            transaction.getInventory().setItem(transaction.getSlot(), targetItem);
         }
 
         this.hasExecuted = true;
+
+        // Final resync — kills any client-side ghost items.
+        for (Inventory inventory : this.inventories) {
+            if (inventory instanceof PlayerInventory) {
+                ((PlayerInventory) inventory).sendArmorContents(this.getSource());
+            }
+            inventory.sendContents(this.getSource());
+        }
 
         return true;
     }
