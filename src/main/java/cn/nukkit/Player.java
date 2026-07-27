@@ -3023,63 +3023,7 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                             break;
                         }
 
-                        // NUKKIT INFINITY: Armor-equip anti-duplication.
-                        // The transaction queue can desync when the player swaps armor fast, because
-                        // canExecute() requires matching haveItems/needItems but the client may
-                        // batch packets out of order. Handle armor slot changes synchronously:
-                        // - swap target item out of armor slot (return it to main inv or drop)
-                        // - if target item is not AIR, consume exactly one matching item from main inv
-                        // - apply armor slot change immediately
-                        // - resync the client to the real server state
-                        Item newArmor = containerSetSlotPacket.item;
-                        int armorSlot = containerSetSlotPacket.slot + this.inventory.getSize();
-                        Item oldArmor = this.inventory.getItem(armorSlot);
-
-                        // Put the previously equipped armor back into main inventory (or drop if full)
-                        if (oldArmor.getId() != Item.AIR && oldArmor.getCount() > 0) {
-                            Item[] leftover = this.inventory.addItem(oldArmor);
-                            for (Item drop : leftover) {
-                                this.level.dropItem(this, drop);
-                            }
-                        }
-
-                        // Take one matching item from main inventory for the new armor piece
-                        // (skip for creative — they can pull items from the creative catalog)
-                        if (newArmor.getId() != Item.AIR && newArmor.getCount() > 0 && !this.isCreative()) {
-                            boolean found = false;
-                            for (int i = 0; i < this.inventory.getSize(); i++) {
-                                Item it = this.inventory.getItem(i);
-                                if (it.equals(newArmor, true, true) && it.getCount() >= newArmor.getCount()) {
-                                    Item shrink = it.clone();
-                                    shrink.setCount(it.getCount() - newArmor.getCount());
-                                    if (shrink.getCount() <= 0) {
-                                        this.inventory.clear(i);
-                                    } else {
-                                        this.inventory.setItem(i, shrink);
-                                    }
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            if (!found) {
-                                // Couldn't find the item — abort and resync to prevent dup
-                                this.inventory.sendArmorSlot(armorSlot, this);
-                                this.inventory.sendContents(this);
-                                break;
-                            }
-                        }
-
-                        // Apply the new armor slot
-                        if (newArmor.getId() == Item.AIR || newArmor.getCount() <= 0) {
-                            this.inventory.clear(armorSlot);
-                        } else {
-                            this.inventory.setArmorItem(containerSetSlotPacket.slot, newArmor);
-                        }
-
-                        // Resync client to actual server state — kills any client-side ghost items
-                        this.inventory.sendArmorContents(this);
-                        this.inventory.sendContents(this);
-                        break;
+                        transaction = new BaseTransaction(this.inventory, containerSetSlotPacket.slot + this.inventory.getSize(), this.inventory.getArmorItem(containerSetSlotPacket.slot), containerSetSlotPacket.item);
                     } else if (this.windowIndex.containsKey(containerSetSlotPacket.windowid)) {
                         this.craftingType = 0;
                         Inventory inv = this.windowIndex.get(containerSetSlotPacket.windowid);
@@ -3093,7 +3037,8 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
                         break;
                     }
 
-                    if (transaction.getSourceItem().deepEquals(transaction.getTargetItem()) && transaction.getTargetItem().getCount() == transaction.getSourceItem().getCount()) { //No changes!
+                    if (transaction.getSourceItem().equals(transaction.getTargetItem(), true, true)
+                            && transaction.getTargetItem().getCount() == transaction.getSourceItem().getCount()) { //No changes!
                         //No changes, just a local inventory update sent by the server
                         break;
                     }
