@@ -259,13 +259,13 @@ public class Server {
             }
         }
 
-        this.logger.info("Loading " + TextFormat.GREEN + "magmablock.yml" + TextFormat.WHITE + "...");
-        this.advancedConfig = new Config(this.dataPath + "magmablock.yml", Config.YAML);
+        this.logger.info("Loading " + TextFormat.GREEN + "nkInfinity.yml" + TextFormat.WHITE + "...");
+        this.advancedConfig = new Config(this.dataPath + "nkInfinty.yml", Config.YAML);
 
         this.logger.info("Loading " + TextFormat.GREEN + "server.properties" + TextFormat.WHITE + "...");
         this.properties = new Config(this.dataPath + "server.properties", Config.PROPERTIES, new ConfigSection() {
             {
-                put("motd", "MagmaBlock Server For Minecraft: PE");
+                put("motd", "Nukkit Infinity Server For Minecraft: PE");
                 put("server-port", 19132);
                 put("server-ip", "0.0.0.0");
                 put("view-distance", 10);
@@ -1160,7 +1160,7 @@ public class Server {
     }
 
     public String getName() {
-        return "MagmaBlock";
+        return "Nukkit Infinity";
     }
 
     public boolean isRunning() {
