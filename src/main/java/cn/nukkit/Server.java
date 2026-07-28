@@ -249,11 +249,11 @@ public class Server {
         this.logger.info("Loading " + TextFormat.GREEN + "nukkit.yml" + TextFormat.WHITE + "...");
         this.config = new Config(this.dataPath + "nukkit.yml", Config.YAML);
 
-        if(!new File(this.dataPath + "magmablock.yml").exists()){
+        if(!new File(this.dataPath + "nkInfinity.yml").exists()){
             InputStream advacedConf = this.getClass().getClassLoader().getResourceAsStream("magmablock.yml");
 
             try {
-                Utils.writeFile(this.dataPath + "magmablock.yml", advacedConf);
+                Utils.writeFile(this.dataPath + "nkinfinity.yml", advacedConf);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
