@@ -790,6 +790,9 @@ public class Server {
                 synapse.shutdown();
             }
 
+            this.getLogger().debug("Stopping proxy sessions");
+            cn.nukkit.network.proxy.ProxyManager.getInstance().shutdown();
+
             this.getLogger().debug("Stopping network interfaces");
             for (SourceInterface interfaz : this.network.getInterfaces()) {
                 interfaz.shutdown();
