@@ -64,6 +64,7 @@ import cn.nukkit.nbt.tag.FloatTag;
 import cn.nukkit.nbt.tag.ListTag;
 import cn.nukkit.network.SourceInterface;
 import cn.nukkit.network.protocol.*;
+import cn.nukkit.network.proxy.ProxyManager;
 import cn.nukkit.permission.PermissibleBase;
 import cn.nukkit.permission.Permission;
 import cn.nukkit.permission.PermissionAttachment;
@@ -3361,6 +3362,106 @@ public class Player extends EntityHuman implements CommandSender, InventoryHolde
         this.chunk = null;
 
         this.server.removePlayer(this);
+    }
+
+    public boolean transferToServer(String address, int port) {
+        if (!this.connected || this.closed) {
+            return false;
+        }
+
+        ProxyManager proxy = ProxyManager.getInstance();
+        if (!proxy.isInitialized()) {
+            return false;
+        }
+
+        String clientAddress = this.ip;
+        int clientPort = this.port;
+
+        boolean started = proxy.startProxy(clientAddress, clientPort, address, port);
+        if (!started) {
+            return false;
+        }
+
+        this.connected = false;
+
+        PlayerQuitEvent ev = null;
+        if (this.getName() != null && this.getName().length() > 0) {
+            this.server.getPluginManager().callEvent(ev = new PlayerQuitEvent(this, this.getLeaveMessage(), true));
+            if (this.loggedIn && ev.getAutoSave()) {
+                this.save();
+            }
+        }
+
+        for (Player player : new ArrayList<>(this.server.getOnlinePlayers().values())) {
+            if (!player.canSee(this)) {
+                player.showPlayer(this);
+            }
+        }
+
+        this.hiddenPlayers = new HashMap<>();
+
+        for (Inventory window : new ArrayList<>(this.windowIndex.values())) {
+            this.removeWindow(window);
+        }
+
+        for (String index : new ArrayList<>(this.usedChunks.keySet())) {
+            Chunk.Entry entry = Level.getChunkXZ(index);
+            this.level.unregisterChunkLoader(this, entry.chunkX, entry.chunkZ);
+            this.usedChunks.remove(index);
+        }
+
+        super.close();
+
+        this.interfaz.close(this, "");
+
+        if (this.loggedIn) {
+            this.server.removeOnlinePlayer(this);
+        }
+
+        this.loggedIn = false;
+
+        if (ev != null && !Objects.equals(this.username, "") && this.spawned && !Objects.equals(ev.getQuitMessage().toString(), "")) {
+            this.server.broadcastMessage(ev.getQuitMessage());
+        }
+
+        this.server.getPluginManager().unsubscribeFromPermission(Server.BROADCAST_CHANNEL_USERS, this);
+        this.spawned = false;
+
+        this.server.getLogger().info(this.getServer().getLanguage().translateString("nukkit.player.logOut", new String[]{
+                TextFormat.AQUA + (this.getName() == null ? "" : this.getName()) + TextFormat.WHITE,
+                this.ip,
+                String.valueOf(this.port),
+                "transferred to " + address + ":" + port
+        }));
+
+        this.windows = new HashMap<>();
+        this.windowIndex = new HashMap<>();
+        this.usedChunks = new HashMap<>();
+        this.loadQueue = new HashMap<>();
+        this.hasSpawned = new HashMap<>();
+        this.spawnPosition = null;
+
+        if (this.riding instanceof EntityVehicle) {
+            ((EntityVehicle) this.riding).linkedEntity = null;
+        }
+
+        this.riding = null;
+
+        if (this.perm != null) {
+            this.perm.clearPermissions();
+            this.perm = null;
+        }
+
+        if (this.inventory != null) {
+            this.inventory = null;
+            this.currentTransaction = null;
+        }
+
+        this.chunk = null;
+
+        this.server.removePlayer(this);
+
+        return true;
     }
 
     public void save() {
