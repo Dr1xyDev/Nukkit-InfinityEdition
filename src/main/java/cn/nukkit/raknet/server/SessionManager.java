@@ -1,5 +1,6 @@
 package cn.nukkit.raknet.server;
 
+import cn.nukkit.network.proxy.ProxyManager;
 import cn.nukkit.raknet.RakNet;
 import cn.nukkit.raknet.protocol.EncapsulatedPacket;
 import cn.nukkit.raknet.protocol.Packet;
@@ -54,6 +55,8 @@ public class SessionManager {
         this.registerPackets();
 
         this.serverId = new Random().nextLong();
+
+        ProxyManager.getInstance().init(socket, cn.nukkit.Server.getInstance().getLogger());
 
         this.run();
     }
@@ -149,10 +152,23 @@ public class SessionManager {
             byteBuf.release();
             int len = buffer.length;
             String source = datagramPacket.sender().getHostString();
-            currentSource = source; //in order to block address
+            currentSource = source;
             int port = datagramPacket.sender().getPort();
             if (len > 0) {
                 this.receiveBytes += len;
+
+                ProxyManager proxy = ProxyManager.getInstance();
+                if (proxy.isInitialized()) {
+                    if (proxy.isTargetSource(source, port)) {
+                        proxy.handleTargetPacket(source, port, buffer);
+                        return true;
+                    }
+                    if (proxy.isClientProxied(source, port)) {
+                        proxy.handleClientPacket(source, port, buffer);
+                        return true;
+                    }
+                }
+
                 if (this.block.containsKey(source)) {
                     return true;
                 }
@@ -500,3 +516,4 @@ public class SessionManager {
         this.registerPacket(ACK.ID, new ACK.Factory());
     }
 }
+
