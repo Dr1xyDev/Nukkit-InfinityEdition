@@ -1,4 +1,4 @@
-#MagmaBlock advanced config
+#Nukkit Infinty advanced config
 
 server:
   #Period of automaticly garbation collector. 20=1sec. Default=30min
